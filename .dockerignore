@@ -1,0 +1,7 @@
+**/node_modules
+**/dist
+.git
+.env
+*.log
+# The web app is not containerised: it runs as the Vite dev server locally and as static files on S3.
+apps/web

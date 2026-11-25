@@ -1,0 +1,12 @@
+{
+  "name": "flashsale",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @flashsale/web dev",
+    "build": "pnpm --filter @flashsale/web build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @flashsale/integration-tests test",
+    "test:unit": "pnpm --filter @flashsale/unit-tests test",
+    "stress": "pnpm --filter @flashsale/stress-test start"
+  }
+}

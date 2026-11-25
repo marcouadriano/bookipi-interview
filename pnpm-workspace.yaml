@@ -1,0 +1,6 @@
+packages:
+  - apps/*
+  - packages/*
+  - tests/*
+allowBuilds:
+  esbuild: false # its install script only checks the binary; tsx works without it

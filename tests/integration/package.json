@@ -1,0 +1,19 @@
+{
+  "name": "@flashsale/integration-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --import tsx --test --test-concurrency=1 \"*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@flashsale/shared": "workspace:*",
+    "@types/node": "^26.6.6",
+    "@types/pg": "^8.15.4",
+    "ioredis": "^5.6.1",
+    "pg": "^8.16.3",
+    "tsx": "^4.20.3",
+    "typescript": "^7.0.2"
+  }
+}

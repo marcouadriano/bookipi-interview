@@ -1,0 +1,21 @@
+# Throwaway Redis (port 16380) and Postgres (port 15433) for the integration tests, with nothing
+# persisted, so the tests can wipe them. The commands are in the README, under "Tests".
+name: flashsale-test
+
+services:
+  redis:
+    image: docker.io/library/redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "16380:6379"
+
+  postgres:
+    image: docker.io/library/postgres:17-alpine
+    command: ["postgres", "-c", "fsync=off"]
+    environment:
+      POSTGRES_DB: flashsale_test
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "15433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data

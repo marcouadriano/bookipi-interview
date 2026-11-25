@@ -1,0 +1,26 @@
+{
+  "name": "@flashsale/sale-service",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx scripts/dev.ts",
+    "start:waiting-room": "tsx src/waiting-room.ts",
+    "start:purchase": "tsx src/purchase.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@flashsale/shared": "workspace:*",
+    "express": "^5.3.0",
+    "ioredis": "^5.6.1",
+    "pg": "^8.16.3",
+    "pino-http": "^11.0.0",
+    "tsx": "^4.20.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "@types/pg": "^8.15.4",
+    "typescript": "^7.0.2"
+  }
+}

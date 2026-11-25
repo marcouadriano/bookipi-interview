@@ -1,0 +1,6 @@
+# Publishes Postgres on 15434 so the stress test can compare its orders with what users were told.
+# Use it together with the main file. The full command is in the README, under "Stress test".
+services:
+  postgres:
+    ports:
+      - "15434:5432"

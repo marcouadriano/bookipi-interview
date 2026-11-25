@@ -1,0 +1,157 @@
+# The local stack, without the web app (run `pnpm dev` for that). The steps are in the README,
+# under "Run it with containers".
+
+# Sale values that must be identical in every service.
+x-sale: &sale
+  SALE_ID: ${SALE_ID:-flash-sale-1}
+  TOTAL_STOCK: ${TOTAL_STOCK:-100}
+  SALE_START: ${SALE_START:?set SALE_START to an ISO-8601 time, e.g. 2026-01-01T10:00:00Z}
+  SALE_END: ${SALE_END:?set SALE_END to an ISO-8601 time, e.g. 2026-01-01T11:00:00Z}
+
+# Optional tuning. A name with no value is passed through only when it is set in your shell or .env.
+x-sale-tuning: &sale-tuning
+  ADMIT_BATCH_SIZE:
+  ADMIT_INTERVAL_MS:
+  ADMIT_WINDOW_MS:
+  RATE_LIMIT_USER_MAX:
+  RATE_LIMIT_USER_WINDOW_MS:
+  RATE_LIMIT_IP_ENABLED: # set to false for the stress test
+  RATE_LIMIT_IP_MAX:
+  RATE_LIMIT_IP_WINDOW_MS:
+
+x-database: &database
+  DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-flashsale}
+
+services:
+  redis:
+    image: docker.io/library/redis:7.4-alpine
+    # An accepted purchase must survive a restart: write to disk before replying.
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "always"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres:
+    image: docker.io/library/postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-flashsale}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # One-off: tables, the sale_buyers view, the sales row and the read-only sale_reader role.
+  # Safe to run again.
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/order-service/Dockerfile
+    image: flashsale/order-service
+    command: ["node", "--import", "tsx", "scripts/migrate.ts"]
+    restart: "no"
+    environment:
+      <<: [*database, *sale]
+      SALE_READER_PASSWORD: ${SALE_READER_PASSWORD:?set SALE_READER_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  order-service:
+    build:
+      context: .
+      dockerfile: apps/order-service/Dockerfile
+    image: flashsale/order-service
+    init: true
+    environment:
+      <<: [*database, *sale]
+      REDIS_URL: redis://redis:6379
+      HEALTH_PORT: 3001
+      BATCH_SIZE:
+      MAX_DELIVERIES:
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # The two Sale Service apps run from one image with different commands.
+  waiting-room:
+    build: &sale-build
+      context: .
+      dockerfile: apps/sale-service/Dockerfile
+    image: flashsale/sale-service
+    init: true
+    command: ["node", "--import", "tsx", "src/waiting-room.ts"]
+    ports:
+      - "3000:3000"
+    environment:
+      <<: [*sale, *sale-tuning]
+      REDIS_URL: redis://redis:6379
+      WAITING_ROOM_PORT: 3000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  purchase:
+    build: *sale-build
+    image: flashsale/sale-service
+    init: true
+    command: ["node", "--import", "tsx", "src/purchase.ts"]
+    ports:
+      - "3002:3002"
+    environment:
+      <<: [*sale, *sale-tuning]
+      REDIS_URL: redis://redis:6379
+      PURCHASE_PORT: 3002
+      SALE_READER_DATABASE_URL: postgres://sale_reader:${SALE_READER_PASSWORD:?set SALE_READER_PASSWORD}@postgres:5432/${POSTGRES_DB:-flashsale}
+      RUN_ID_CHECK_MS:
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3002/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  redis-data:
+  postgres-data:
